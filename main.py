@@ -6,11 +6,49 @@ import subprocess
 import time
 import uuid
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 
 app = FastAPI()
 
+def java_run_testcase(class_name, file_path, testcase):
+    try:  
+        start = time.time()
+        run_process = subprocess.run(
+            ["java", "-cp", file_path, class_name],
+            input=testcase,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5
+        )
+        duration = time.time() - start
+        return {
+            "stdout": run_process.stdout.strip(),
+            "stderr": run_process.stderr.strip(),
+            "exit_code": run_process.returncode,
+            "execution_time" : duration,
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "stdout": "",
+            "stderr": "Execution timed out",
+            "exit_code": 124,
+        }
+    # For Debugging 
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        print(f"Type of error: {type(e)}")
+        return {
+            "stdout": "",
+            "stderr": str(e),
+            "exit_code": -1,
+        }
+    
 def java_compile(file_name, file_path, testcases):
-    os.chdir(file_path) 
+    # Formating to Absoulte Path
+    class_name = os.path.splitext(file_name)[0]
+    file_name = os.path.join(file_path, file_name)
+    
     # Test Compilation
     process = subprocess.run(
         ["javac", file_name],
@@ -27,36 +65,16 @@ def java_compile(file_name, file_path, testcases):
             "details": process.stderr
     }
 
-    # Check Test Cases
-    results = []
-    try:
-        for testcase in testcases:
-            start = time.time()
-            run_process = subprocess.run(
-                ["java", "-cp", ".", file_name],
-                input=testcase,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=5
-            )
-            duration = time.time() - start
-            results.append({
-                "stdout": run_process.stdout.strip(),
-                "stderr": run_process.stderr.strip(),
-                "exit_code": run_process.returncode,
-                "execution_time" : duration,
-            })
-    except subprocess.TimeoutExpired:
-        return {
-            "stdout": "",
-            "stderr": "Execution timed out",
-            "exit_code": 124,
-        }
-    # For Debugging 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        print(f"Type of error: {type(e)}")
+    # Running All TestCase at a time
+    worker_count = len(testcases)
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        results = list(executor.map(lambda tc: java_run_testcase(class_name, file_path, tc), testcases))
+
+    # Check the result for TimeLimit or Error
+    for result in results:
+        if (result["exit_code"] != 0):
+            return result # Just returing the first failure
+    
     
     return results
 

@@ -5,7 +5,7 @@ A lightweight code execution API for compiling and running code in a secure, san
 | Language | Support |
 |----------|---------|
 | ☕ Java   | ✅       |
-| 🐍 Python | ❌       |
+| 🐍 Python | ✅      |
 | 💻 C      | ❌       |
 
 ## How to run
