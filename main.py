@@ -5,6 +5,7 @@ import os
 import subprocess
 import time
 import uuid
+import shutil
 
 app = FastAPI()
 
@@ -91,5 +92,8 @@ def compile(input_json: InputJson):
 
     if (language == "java"):
         responseJson = java_compile(file_name, file_path, input_json.testcases)
-        
+    
+    # Cleanup 
+    shutil.rmtree(file_path)
+
     return responseJson
