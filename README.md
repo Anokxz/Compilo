@@ -18,4 +18,8 @@ docker run --rm -p 8000:8000 compiler
 
 Access the API docs : http://localhost:8000/docs
 
-2
+## Futhur Ideas
+1. [ ] Handling Expected output, standard input in FastAPI
+2. [ ] Job Queue
+3. [ ] Logging Process
+4. [ ] Response Status Code Implementation
