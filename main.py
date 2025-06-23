@@ -6,165 +6,99 @@ import subprocess
 import time
 import uuid
 import shutil
-from concurrent.futures import ThreadPoolExecutor
+import sys
+
+# Import compile function from compiler.py
+import compiler 
+# Import runner function for running testcases
+import runner
 
 app = FastAPI()
 
-def java_run_testcase(class_name, file_path, testcase):
-    try:  
-        start = time.time()
-        run_process = subprocess.run(
-            ["java", "-cp", file_path, class_name],
-            input=testcase,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=5
-        )
-        duration = time.time() - start
-        return {
-            "stdout": run_process.stdout.strip(),
-            "stderr": run_process.stderr.strip(),
-            "exit_code": run_process.returncode,
-            "execution_time" : duration,
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "stdout": "",
-            "stderr": "Execution timed out",
-            "exit_code": 124,
-        }
-    # For Debugging 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        print(f"Type of error: {type(e)}")
-        return {
-            "stdout": "",
-            "stderr": str(e),
-            "exit_code": -1,
-        }
-    
-def java_compile(file_name, file_path, testcases):
-    # Formating to Absoulte Path
-    class_name = os.path.splitext(file_name)[0]
-    file_name = os.path.join(file_path, file_name)
-    
-    # Test Compilation
-    process = subprocess.run(
-        ["javac", file_name],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+# Valid Languages
+languages = {
+    "py"  : { "file_name" : "main.py", "run_command" : "python3"}, 
+    "c"   : { "file_name" : "main.c", "compile_command" : "gcc", "run_command": ""}, 
+    "java": { "file_name" : "Main.java", "compile_command" : "javac", "run_command": "java -cp"}
+}
 
-    # Compilation Failure
-    if process.returncode != 0:
-        return {
-            "status": 400,
-            "error": "Compilation Error",
-            "details": process.stderr
-    }
-
-    # Running All TestCase at a time
-    worker_count = len(testcases)
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        results = list(executor.map(lambda tc: java_run_testcase(class_name, file_path, tc), testcases))
-
-    # Check the result for TimeLimit or Error
-    for result in results:
-        if (result["exit_code"] != 0):
-            return result # Just returing the first failure
-    
-    
-    return results
-
-def python_compile(file_name, file_path, testcases):
-    os.chdir(file_path)
-    results = []
-    # Direct Execution 
-    for testcase in testcases:
-        try:
-            start = time.time()
-            run_process = subprocess.run (
-                ["python3", file_name],
-                input=testcase,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=5,
-            )
-
-            duration = time.time() - start
-
-            if (run_process.returncode != 0):
-                return {
-                    "status": 400,
-                    "error": "During Execution Of Python",
-                    "details": run_process.stderr.strip(),
-                    "return code": run_process.returncode
-                }
-            
-            results.append(
-                {
-                    "stdout": run_process.stdout.strip(),
-                    "stderr": run_process.stderr.strip(),
-                    "exit_code": run_process.returncode,
-                    "execution_time" : duration,
-                }
-            )
-        
-        except subprocess.TimeoutExpired:
-            return {
-                "stdout": "",
-                "stderr": "Execution timed out",
-                "exit_code": 124,
-            }
-        except Exception as e:
-            # For Debugging other Errors
-            print("Error : ", e)
-        
-        
-        return results
 
 @app.post("/")
-def compile(input_json: InputJson):
+def main(input_json: InputJson, first_run=True):
     language = input_json.language.lower()
-
-    languages = {
-        "py"  : { "file_name" : "main.py", "command" : "python"}, 
-        "c"   : { "file_name" : "main.c", "command" : "gcc"}, 
-        "java": { "file_name" : "Main.java", "command" : "javac"}
-    }
 
     if language not in languages:
         return JSONResponse(
             status_code=400,
             content={"status": 400, "problem": "language not supported"}
         )
-
-    file_name = languages[language]["file_name"]
+    
     job_id = str(uuid.uuid4())
     file_path = f"/tmp/{job_id}"
     os.makedirs(file_path, exist_ok=True)
 
-
+    file_name = languages[language]["file_name"]
     with open(f"{file_path}/{file_name}", 'w') as file:
         file.write(input_json.code)
     
-    # Default return for supported language 
-    responseJson = {"status": 200, "message": "language support will be implemented soon"}
-
+    full_path = os.path.join(file_path, file_name)
     if (language == "java"):
-        responseJson = java_compile(file_name, file_path, input_json.testcases)
+        compile_command = f"javac {full_path}"
+        compile_result = compiler.compile_code(compile_command)
+
+        #Checking for Compiling Error
+        if compile_result["return_code"] != 0:
+            return compile_result
+        
+        class_name = class_name = os.path.splitext(file_name)[0]
+        run_command = f"java -cp {file_path} {class_name}"
+        
+        
     elif (language == "py"):
-        responseJson = python_compile(file_name, file_path, input_json.testcases)
+        run_command = f"python3 {full_path}"
+        run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
     elif (language == "c"):
-        responseJson = python_compile(file_name, file_path, input_json.testcases)
+        executable = f"{file_path}/{os.path.splitext(file_name)[0]}"
+        compile_command = f"gcc {full_path} -o {executable}"
+        compile_result = compiler.compile_code(compile_command)
+
+        #Checking for Compiling Error
+        if compile_result["return_code"] != 0:
+            return compile_result
+
+        run_command = f"{executable}"
+        run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
     else:
         # Not possible due to previous check
         pass
+    
+    if not run_testcases_result:
+        return {"status": 200, "message": "language support will be implemented soon"}
+
+    # Check the result for TimeLimit or Error
+    for result in run_testcases_result:
+        if (result["exit_code"] != 0):
+            ''' *** Expermental Feature ***
+            This may cause infinite recurison 
+            If there is error handling of ModuleNotFoundError of user_code
+            Restrict User of Error Handling or
+            Using first_run flag to stop with one try or
+            Let me know if there is better way [ Happy to Learn : ) ]
+            '''
+            #Checking for Python ModuleNotFoundError
+            if first_run and "ModuleNotFoundError" in result["stderr"]:
+                module_name = result["stderr"].split()[-1][1:-1] # Little Magic to get the module
+                install_process = subprocess.run(
+                    f"pip install {module_name}".split(), # f"{sys.executable} -m pip install {module_name}".split(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                return main(input_json, first_run=False)
+            
+            return result # Just returing the first failure
 
     # Cleanup 
     shutil.rmtree(file_path)
 
-    return responseJson
+    return run_testcases_result
