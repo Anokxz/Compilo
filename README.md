@@ -6,7 +6,7 @@ A lightweight code execution API for compiling and running code in a secure, san
 |----------|---------|
 | ☕ Java   | ✅       |
 | 🐍 Python | ✅      |
-| 💻 C      | ❌       |
+| 💻 C      | ✅       |
 
 ## How to run
 ```
@@ -23,3 +23,4 @@ Access the API docs : http://localhost:8000/docs
 2. [ ] Job Queue
 3. [ ] Logging Process
 4. [ ] Response Status Code Implementation
+5. [X] MultiThreading of testcase execution
