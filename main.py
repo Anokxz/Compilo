@@ -24,7 +24,7 @@ languages = {
 
 
 @app.post("/", response_model=OutputJson)
-def main(input_json: InputJson, first_run=True) -> dict:
+def main(input_json: InputJson, first_run: bool = True) -> dict:
     language = input_json.language.lower()
 
     if language not in languages:
