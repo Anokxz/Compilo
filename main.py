@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from models import InputJson
+from models import InputJson, OutputJson
 from fastapi.responses import JSONResponse
 import os
 import subprocess
@@ -23,18 +23,19 @@ languages = {
 }
 
 
-@app.post("/")
-def main(input_json: InputJson, first_run=True):
+@app.post("/", response_model=OutputJson)
+def main(input_json: InputJson, first_run=True) -> dict:
     language = input_json.language.lower()
 
     if language not in languages:
-        return JSONResponse(
-            status_code=400,
-            content={"status": 400, "problem": "language not supported"}
-        )
+        return {
+                "status": "language not supported",
+                "compilation":  {},
+                "testcases" : []
+        }
     
-    job_id = str(uuid.uuid4())
-    file_path = f"/tmp/{job_id}"
+    random_folder = str(uuid.uuid4())
+    file_path = f"/tmp/{random_folder}"
     os.makedirs(file_path, exist_ok=True)
 
     file_name = languages[language]["file_name"]
@@ -51,10 +52,9 @@ def main(input_json: InputJson, first_run=True):
             return compile_result
         
         class_name = class_name = os.path.splitext(file_name)[0]
-        run_command = f"java -cp {file_path} {class_name}"
-        
-        
+        run_command = f"java -cp {file_path} {class_name}"     
     elif (language == "py"):
+        compile_result = {}
         run_command = f"python3 {full_path}"
         run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
     elif (language == "c"):
@@ -64,20 +64,21 @@ def main(input_json: InputJson, first_run=True):
 
         #Checking for Compiling Error
         if compile_result["return_code"] != 0:
-            return compile_result
+            return {
+                    "status" : "Compiler Error",
+                    "compilation":  compile_result,
+                    "testcases" : []
+            }
 
         run_command = f"{executable}"
         run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
     else:
         # Not possible due to previous check
         pass
-    
-    if not run_testcases_result:
-        return {"status": 200, "message": "language support will be implemented soon"}
 
     # Check the result for TimeLimit or Error
     for result in run_testcases_result:
-        if (result["exit_code"] != 0):
+        if (result["return_code"] != 0):
             ''' *** Expermental Feature ***
             This may cause infinite recurison 
             If there is error handling of ModuleNotFoundError of user_code
@@ -94,11 +95,14 @@ def main(input_json: InputJson, first_run=True):
                     stderr=subprocess.PIPE,
                     text=True
                 )
+                
                 return main(input_json, first_run=False)
-            
-            return result # Just returing the first failure
 
     # Cleanup 
     shutil.rmtree(file_path)
-
-    return run_testcases_result
+    
+    return {
+            "status" : "Success",
+            "compilation" : compile_result,
+            "testcases" : run_testcases_result
+    }

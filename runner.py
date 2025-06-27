@@ -3,7 +3,6 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 def run_testcase(command: str, testcase: str) -> dict :
-    
     try:  
         start = time.time()
         run_process = subprocess.run(
@@ -21,10 +20,11 @@ def run_testcase(command: str, testcase: str) -> dict :
             "return_code": run_process.returncode,
             "execution_time" : duration,
         }
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as processError:
         return {
-            "stdout": run_process.stdout,
-            "stderr": "Execution timed out",
+            "stdout": processError.stdout or "",
+            "stderr": "ExecutionTimeOut",
+            "execution_time": processError.timeout,
             "return_code": 124,
         }
     # For Debugging 

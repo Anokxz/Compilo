@@ -12,19 +12,17 @@ def compile_code(command: str) -> dict :
     )
     duration = time.time() - start
     
-    # Compilation Failure
-    if process.returncode != 0 :
-        return {
-            "status": 400,
-            "error": "Compilation Error",
-            "details": process.stderr,
+    result = {
+            "stdout": process.stdout,
+            "stderr": process.stderr,
+            "duration" : duration,
             "return_code": process.returncode,
     }
 
+    # Compilation Failure
+    if process.returncode != 0 :
+        result["status"] = "Compilation Error"
     else :
-        return {
-            "status" : 200,
-            "details": process.stdout,
-            "return_code" : process.returncode,
-            "duration" : duration,
-        }
+        result["status"] = "Compilation Success"
+    
+    return result
