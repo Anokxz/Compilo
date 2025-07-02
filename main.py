@@ -52,7 +52,9 @@ def main(input_json: InputJson, first_run: bool = True) -> dict:
             return compile_result
         
         class_name = class_name = os.path.splitext(file_name)[0]
-        run_command = f"java -cp {file_path} {class_name}"     
+        run_command = f"java -cp {file_path} {class_name}"
+        run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
+
     elif (language == "py"):
         compile_result = {}
         run_command = f"python3 {full_path}"
