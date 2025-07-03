@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from models import InputJson, OutputJson
 from fastapi.responses import JSONResponse
+from typing import Optional
 import os
 import subprocess
 import time
@@ -17,14 +18,15 @@ app = FastAPI()
 
 # Valid Languages
 languages = {
-    "py"  : { "file_name" : "main.py", "run_command" : "python3"}, 
-    "c"   : { "file_name" : "main.c", "compile_command" : "gcc", "run_command": ""}, 
-    "java": { "file_name" : "Main.java", "compile_command" : "javac", "run_command": "java -cp"}
+    "PYTHON"  : { "file_name" : "main.py", "run_command" : "python3"}, 
+    "C"   : { "file_name" : "main.c", "compile_command" : "gcc", "run_command": ""}, 
+    "JAVA": { "file_name" : "Main.java", "compile_command" : "javac", "run_command": "java -cp"},
+    "CPP" : { "file_name" : "main.cpp", "compile_command" : "cpp", "run_command": ""}
 }
 
 
 @app.post("/", response_model=OutputJson)
-def main(input_json: InputJson, first_run: bool = True) -> dict:
+def main(input_json: InputJson, Optional[first_run]: bool = True) -> dict:
     language = input_json.language.lower()
 
     if language not in languages:
@@ -43,23 +45,27 @@ def main(input_json: InputJson, first_run: bool = True) -> dict:
         file.write(input_json.code)
     
     full_path = os.path.join(file_path, file_name)
-    if (language == "java"):
+    if (language == "JAVA"):
         compile_command = f"javac {full_path}"
         compile_result = compiler.compile_code(compile_command)
 
         #Checking for Compiling Error
         if compile_result["return_code"] != 0:
-            return compile_result
+            return {
+                    "status" : "Compiler Error",
+                    "compilation":  compile_result,
+                    "testcases" : []
+            }
         
         class_name = class_name = os.path.splitext(file_name)[0]
         run_command = f"java -cp {file_path} {class_name}"
         run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
 
-    elif (language == "py"):
+    elif (language == "PYTHON"):
         compile_result = {}
         run_command = f"python3 {full_path}"
         run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
-    elif (language == "c"):
+    elif (language == "C"):
         executable = f"{file_path}/{os.path.splitext(file_name)[0]}"
         compile_command = f"gcc {full_path} -o {executable}"
         compile_result = compiler.compile_code(compile_command)
@@ -74,6 +80,22 @@ def main(input_json: InputJson, first_run: bool = True) -> dict:
 
         run_command = f"{executable}"
         run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
+    elif (language == "CPP"):
+        executable = f"{file_path}/{os.path.splitext(file_name)[0]}"
+        compile_command = f"g++ {full_path} -o {executable}"
+        compile_result = compiler.compile_code(compile_code)
+        
+        #Checking for Compiling Error
+        if compile_result["return_code"] != 0:
+            return {
+                    "status" : "Compiler Error",
+                    "compilation":  compile_result,
+                    "testcases" : []
+            }
+
+        run_command = f"{executable}"
+        run_testcases = runner.run_all_testcases(run_command, input_json.testcases)
+
     else:
         # Not possible due to previous check
         pass
