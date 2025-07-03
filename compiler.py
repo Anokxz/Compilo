@@ -1,7 +1,8 @@
 import time
 import subprocess
+from models import CompilerResult
 
-def compile_code(command: str) -> dict :
+def compile_code(command: str) -> CompilerResult:
     # Test Compilation
     start = time.time() 
     process = subprocess.run(
@@ -18,11 +19,5 @@ def compile_code(command: str) -> dict :
             "duration" : duration,
             "return_code": process.returncode,
     }
-
-    # Compilation Failure
-    if process.returncode != 0 :
-        result["status"] = "Compilation Error"
-    else :
-        result["status"] = "Compilation Success"
     
     return result

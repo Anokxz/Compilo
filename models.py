@@ -5,6 +5,12 @@ class InputJson(BaseModel):
     code: str
     language: str
     testcases : List[str]
+    
+class CompilerResult(BaseModel):
+    stdout: str
+    stderr: str
+    execution_time: float = 0
+    return_code: int
 
 class TestCaseResult(BaseModel):
     stdout: str

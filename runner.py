@@ -1,9 +1,10 @@
 import time
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from models import TestCaseResult
 
-def run_testcase(command: str, testcase: str) -> dict :
-    try:  
+def run_testcase(command: str, testcase: str) -> TestCaseResult:
+    try:
         start = time.time()
         run_process = subprocess.run(
             command.split(),
