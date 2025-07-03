@@ -26,9 +26,8 @@ languages = {
 
 
 @app.post("/", response_model=OutputJson)
-def main(input_json: InputJson, Optional[first_run]: bool = True) -> dict:
-    language = input_json.language.lower()
-
+def main(input_json: InputJson, first_run: Optional[bool] = True) -> dict:
+    language = input_json.language
     if language not in languages:
         return {
                 "status": "language not supported",
@@ -83,7 +82,7 @@ def main(input_json: InputJson, Optional[first_run]: bool = True) -> dict:
     elif (language == "CPP"):
         executable = f"{file_path}/{os.path.splitext(file_name)[0]}"
         compile_command = f"g++ {full_path} -o {executable}"
-        compile_result = compiler.compile_code(compile_code)
+        compile_result = compiler.compile_code(compile_command)
         
         #Checking for Compiling Error
         if compile_result["return_code"] != 0:
@@ -94,7 +93,7 @@ def main(input_json: InputJson, Optional[first_run]: bool = True) -> dict:
             }
 
         run_command = f"{executable}"
-        run_testcases = runner.run_all_testcases(run_command, input_json.testcases)
+        run_testcases_result = runner.run_all_testcases(run_command, input_json.testcases)
 
     else:
         # Not possible due to previous check
